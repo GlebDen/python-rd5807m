@@ -6,6 +6,7 @@
 #
 # This code is provided to help with programming the RDA chip.
 
+from functools import partial
 import pigpio
 
 RDA_I2C_WRITE_ADDRESS = 0x10
@@ -222,53 +223,37 @@ class Rda5807m:
             self.out_buffer[(loop * 2) - 3] = data & 0xff
         self.write_tune(0)  # disable tuning
 
-    def read_dmute(self):
-        data = 0
-        data = self.read_chip(2) & RDA_DMUTE
-        return data
+    READ_METHODS = {
+        "dmute": {"reg": 2, "mask": RDA_DMUTE, "right-shift": 0},
+        "bass": {"reg": 2, "mask": RDA_BASS, "right-shift": 0},
+        "mono": {"reg": 2, "mask": RDA_MONO, "right-shift": 0},
+        "band": {"reg": 3, "mask": RDA_BAND, "right-shift": 0},
+        "space": {"reg": 3, "mask": RDA_SPACE, "right-shift": 0},
+        "de": {"reg": 4, "mask": RDA_DE, "right-shift": 0},
+        "volume": {"reg": 5, "mask": RDA_VOLUME, "right-shift": 0},
+        "st": {"reg": 10, "mask": RDA_ST, "right-shift": 0},
+        "rssi": {"reg": 11, "mask": RDA_RSSI, "right-shift": 10},
+    }
 
-    def read_mono(self):
-        data = 0
-        data = self.read_chip(2) & RDA_MONO
-        return data
+    def __getattr__(self, name):
+        parts = name.split('_')
+        if len(parts) != 2 or parts[0] != "read":
+            raise AttributeError("attribute '%s' not found" % (name,))
+        name = parts[1]
+        if name not in self.READ_METHODS:
+            raise AttributeError("attribute '%s' not found" % (name,))
+        params = self.READ_METHODS[name]
+        return partial(
+            self.read_param,
+            params["reg"],
+            params["mask"],
+            params["right-shift"]
+        )
 
-    def read_bass(self):
-        data = 0
-        data = self.read_chip(2) & RDA_BASS
-        return data
-
-    def read_band(self):
-        data = 0
-        data = self.read_chip(3) & RDA_BAND
-        return data
-
-    def read_space(self):
-        data = 0
-        data = self.read_chip(3) & RDA_SPACE
-        return data
-
-    def read_de(self):
-        data = 0
-        data = self.read_chip(4) & RDA_DE
-        return data
-
-    def read_volume(self):
-        data = 0
-        data = self.read_chip(5) & RDA_VOLUME
-        return data
-
-    def read_st(self):
-        data = 0
-        data = self.read_chip(10) & RDA_ST
-        return data
-
-    def read_rssi(self):
-        data = 0
-        data = (self.read_chip(11) & RDA_RSSI) >> 10
-        return data
+    def read_param(self, reg, mask, right_shift):
+        return (self.read_chip(reg) & mask) >> right_shift
 
     def set_frequency(self, freq_request):
-        # data = self.read_setting("band")
         data = self.read_band()
         if data == RDA_87_108MHZ:
             start_freq = 870
@@ -278,7 +263,6 @@ class Rda5807m:
             start_freq = 760
         elif data == RDA_65_76MHZ:
             start_freq = 650
-        # data = self.read_setting("space")
         data = self.read_space()
         if data == RDA_200KHZ:
             spacing = 0
