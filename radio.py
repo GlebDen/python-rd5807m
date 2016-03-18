@@ -32,7 +32,7 @@ class Radio:
             print("problem while initializing")
             loop.stop()
         if not state:
-            self.radio.write_setting("init", 0)
+            self.radio.write_setting()
             time.sleep(0.2)
 
     def print_prompt(self):
