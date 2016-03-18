@@ -129,8 +129,7 @@ class Rda5807m:
 
         if self.read_chip(13) == 0x5804 and self.read_chip(15) == 0x5804:
             # device not already used, initialize it
-            self.write_setting()
-            self.write_chip(12)
+            self.on()
 
     def write_setting(self):
         # REG 02
@@ -280,6 +279,10 @@ class Rda5807m:
         self.write_chan(new_freq)
         self.write_tune(1)
         self.write_chip(4)
+
+    def on(self):
+        self.write_setting()
+        self.write_chip(12)
 
     def off(self):
         self.write_off()

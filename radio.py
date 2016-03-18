@@ -14,6 +14,7 @@ class Radio:
         self.radio = Rda5807m(1)
 
         self.commands = {
+            "on": {"call": self.radio.on},
             "off": {"call": self.radio.off},
             "bass": {"call": self.radio.set_bass, "type": bool},
             "mute": {"call": self.radio.set_mute, "value": True},
@@ -21,9 +22,13 @@ class Radio:
             "stereo": {"call": self.radio.set_stereo, "value": True},
             "mono": {"call": self.radio.set_stereo, "value": False},
             "volume": {"call": self.set_volume, "type": int},
+            "+": {"call": self.set_volume_plus},
+            "-": {"call": self.set_volume_moins},
             "frequency": {"call": self.set_frequency, "type": float},
             "de-emphasis": {"call": self.set_deemphasis, "type": int},
         }
+
+        self.volume = -1
 
     def initialize(self):
         try:
@@ -47,6 +52,7 @@ class Radio:
             loop.stop()
         elif entry == "help":
             print("commands :")
+            print("   on")
             print("   off")
             print("   help")
             print("   bass=<bool>")
@@ -55,6 +61,8 @@ class Radio:
             print("   mono")
             print("   stereo")
             print("   volume=<int>")
+            print("   +")
+            print("   -")
             print("   frequency=<float>")
             print("   de-emphasis=<int>")
         else:
@@ -88,7 +96,28 @@ class Radio:
         if not 0 <= volume <= 15:
             print("bad volume value (0-15)")
             return
+        self.volume = volume
         self.radio.set_volume(volume)
+
+    def set_volume_moins(self):
+        if self.volume == -1:
+            print("set volume fist")
+            return
+        if self.volume == 0:
+            return
+        self.volume -= 1
+        print("volume: %d" % (self.volume,))
+        self.radio.set_volume(self.volume)
+
+    def set_volume_plus(self):
+        if self.volume == -1:
+            print("set volume fist")
+            return
+        if self.volume == 15:
+            return
+        self.volume += 1
+        print("volume: %d" % (self.volume,))
+        self.radio.set_volume(self.volume)
 
     def set_frequency(self, frequency):
         if not 76 <= frequency <= 107.5:
