@@ -6,13 +6,10 @@
 #
 # This code is provided to help with programming the RDA chip.
 
-import argparse
 import pigpio
-import sys
-import time
 
 
-class Rda5807M:
+class Rda5807m:
 
     RDA_I2C_WRITE_ADDRESS = 0x10
     RDA_I2C_READ_ADDRESS = 0x11
@@ -130,7 +127,7 @@ class Rda5807M:
             data = (self.RDA_TUNE & 0) | self.RDA_76_108MHZ | self.RDA_100KHZ
             self.out_buffer[2] = data >> 8
             self.out_buffer[3] = data & 0xff
-            # REG 04 - audio 50US, no soft mute, disble AFC
+            # REG 04 - audio 50US, no soft mute, disable AFC
             data = self.RDA_50US | self.RDA_AFCD
             self.out_buffer[4] = data >> 8
             self.out_buffer[5] = data & 0xff
@@ -270,89 +267,47 @@ class Rda5807M:
         self.write_setting("tune", 1)
         self.write_chip(4)
 
+    def off(self):
+        self.write_setting("off", 0)
+        self.write_chip(2)
+
+    def set_mute(self, mute):
+        if mute:
+            self.write_setting("dmute", 0)
+            self.write_chip(2)
+        else:
+            self.write_setting("dmute", 1)
+            self.write_chip(2)
+
+    def set_volume(self, volume):
+        self.write_setting("volume", volume)
+        self.write_chip(8)
+
+    def set_bass(self, bass):
+        if bass:
+            self.write_setting("bass", 1)
+            self.write_chip(2)
+        else:
+            self.write_setting("bass", 0)
+            self.write_chip(2)
+
+    def set_stereo(self, stereo):
+        if stereo:
+            self.write_setting("mono", 0)
+            self.write_chip(2)
+        else:
+            self.write_setting("mono", 1)
+            self.write_chip(2)
+
+    def deemphasis(self, deemphasis):
+        if deemphasis == 75:
+            self.write_setting("de", 1)
+            self.write_chip(6)
+        else:
+            self.write_setting("de", 0)
+            self.write_chip(6)
+
     def close(self):
         self.pi.i2c_close(self.read_handle)
         self.pi.i2c_close(self.write_handle)
         self.pi.stop()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Raspberry Pi - RDA5807M radio application")
-    parser.add_argument('-f', "--frequency", type=float, help="frequency to tune", default=87.8)
-    parser.add_argument('-o', "--off", action="store_true", help="turn radio off")
-    parser.add_argument('-m', "--mute", action="store_true", help="mute")
-    parser.add_argument('-v', "--volume", type=int, help="volume", default=8)
-    parser.add_argument('-b', "--bass", action="store_true", help="bass boost")
-    parser.add_argument('-d', "--de-emphasis", type=int, help="de-emphasis (50us or 75us)", default=75)
-    parser.add_argument('-s', "--stereo", action="store_true", help="channel mode")
-    args = parser.parse_args()
-
-    # arguments checks
-    if not 0 <= args.volume <= 15:
-        print("bad volume value (0-15)")
-        sys.exit(1)
-    if not 76 <= args.frequency <= 107.5:
-        print("bad frequency value (76-107.5)")
-        sys.exit(1)
-    if args.de_emphasis not in [50, 75]:
-        print("bad de-emphasis value (50, 75)")
-        sys.exit(1)
-
-    radio = Rda5807M(1)
-
-    # on/off
-    if args.off:
-        radio.write_setting("off", 0)
-        radio.write_chip(2)
-        sys.exit(0)
-
-    try:
-        state = radio.init_chip()
-    except:
-        print("problem while initializing")
-        sys.exit(1)
-    if not state:
-        radio.write_setting("init", 0)
-        time.sleep(0.2)  # delay next command after init
-
-    # frequency
-    freq_request = int(args.frequency * 10)
-    radio.set_frequency(freq_request)
-
-    # mute
-    if args.mute:
-        radio.write_setting("dmute", 0)
-        radio.write_chip(2)
-    else:
-        radio.write_setting("dmute", 1)
-        radio.write_chip(2)
-
-    # volume
-    radio.write_setting("volume", args.volume)
-    radio.write_chip(8)
-
-    # bass
-    if args.bass:
-        radio.write_setting("bass", 1)
-        radio.write_chip(2)
-    else:
-        radio.write_setting("bass", 0)
-        radio.write_chip(2)
-
-    # mono/stereo
-    if args.stereo:
-        radio.write_setting("mono", 0)
-        radio.write_chip(2)
-    else:
-        radio.write_setting("mono", 1)
-        radio.write_chip(2)
-
-    # de-emphasis
-    if args.de_emphasis == 75:
-        radio.write_setting("de", 1)
-        radio.write_chip(6)
-    else:
-        radio.write_setting("de", 0)
-        radio.write_chip(6)
-
-    radio.close()
