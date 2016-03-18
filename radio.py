@@ -27,13 +27,11 @@ class Radio:
 
     def initialize(self):
         try:
-            state = self.radio.init_chip()
+            self.radio.init_chip()
         except:
             print("problem while initializing")
             loop.stop()
-        if not state:
-            self.radio.write_setting()
-            time.sleep(0.2)
+        time.sleep(0.2)
 
     def print_prompt(self):
         print(">> ", end="", flush=True)

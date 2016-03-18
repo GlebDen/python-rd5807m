@@ -114,6 +114,23 @@ class Rda5807m:
     def write_chip(self, count):
         self.pi.i2c_write_device(self.write_handle, bytes(self.out_buffer[:count]))
 
+    def init_chip(self):
+        data = self.read_chip(0)
+        found = False
+        if data >> 8 == RDA_CHIP_ID:
+            found = True
+            self.read_bug = False
+        elif data & 0xff == RDA_CHIP_ID:
+            found = True
+            self.read_bug = True
+        if not found:
+            raise Exception("i2c device not found")
+
+        if self.read_chip(13) == 0x5804 and self.read_chip(15) == 0x5804:
+            # device not already used, initialize it
+            self.write_setting()
+            self.write_chip(12)
+
     def write_setting(self):
         # REG 02
         # normal output, enable mute, stereo, no bass boost
@@ -142,7 +159,6 @@ class Rda5807m:
         data = blend_threshold | RDA_65_50M_MODE | 0x80 | 0x40 | RDA_BLEND_EN
         self.out_buffer[10] = data >> 8
         self.out_buffer[11] = data & 0xff
-        self.write_chip(12)
 
     def write_off(self):
         data = (self.read_chip(2) | RDA_ENABLE) ^ RDA_ENABLE
@@ -183,7 +199,6 @@ class Rda5807m:
         self.out_buffer[3] = data & 0xff
 
     def write_de(self, value):
-        self.write_from_chip()
         data = (self.read_chip(4) | RDA_DE) ^ RDA_DE
         if value == 0:
             data = data | RDA_50US
@@ -193,7 +208,6 @@ class Rda5807m:
         self.out_buffer[5] = data & 0xff
 
     def write_volume(self, value):
-        self.write_from_chip()
         data = (self.read_chip(5) | RDA_VOLUME) ^ RDA_VOLUME
         if value > RDA_VOLUME:
             value = RDA_VOLUME
@@ -207,10 +221,6 @@ class Rda5807m:
             self.out_buffer[(loop * 2) - 4] = data >> 8
             self.out_buffer[(loop * 2) - 3] = data & 0xff
         self.write_tune(0)  # disable tuning
-
-    READ = {
-        "mute": {"mask"}
-    }
 
     def read_dmute(self):
         data = 0
@@ -257,23 +267,6 @@ class Rda5807m:
         data = (self.read_chip(11) & RDA_RSSI) >> 10
         return data
 
-    def init_chip(self):
-        data = self.read_chip(0)
-        found = False
-        if data >> 8 == RDA_CHIP_ID:
-            found = True
-            self.read_bug = False
-        elif data & 0xff == RDA_CHIP_ID:
-            found = True
-            self.read_bug = True
-        if not found:
-            raise Exception("i2c device not found")
-        if self.read_chip(13) == 0x5804 and self.read_chip(15) == 0x5804:
-            result = False  # not set up
-        else:
-            result = True  # already used
-        return result
-
     def set_frequency(self, freq_request):
         # data = self.read_setting("band")
         data = self.read_band()
@@ -317,6 +310,7 @@ class Rda5807m:
             self.write_chip(2)
 
     def set_volume(self, volume):
+        self.write_from_chip()
         self.write_volume(volume)
         self.write_chip(8)
 
@@ -337,6 +331,7 @@ class Rda5807m:
             self.write_chip(2)
 
     def set_deemphasis(self, deemphasis):
+        self.write_from_chip()
         if deemphasis == 75:
             self.write_de(1)
             self.write_chip(6)
