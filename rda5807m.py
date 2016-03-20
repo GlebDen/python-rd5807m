@@ -139,23 +139,21 @@ class Rda5807m:
             self.on()
 
     def write_setting(self):
-        # REG 02
-        # normal output, enable mute, stereo, no bass boost
+        # REG 02 - normal output, enable mute, stereo, no bass boost
         # clock = 32.768KHZ, RDS enabled, new demod method, power on
-        data = RDA_DHIZ | RDA_32_768KHZ | RDA_RDS_EN | \
-            RDA_NEW_METHOD | RDA_ENABLE
+        data = RDA_DHIZ | RDA_32_768KHZ | RDA_RDS_EN | RDA_NEW_METHOD | RDA_ENABLE
         self.out_buffer[0] = data >> 8
         self.out_buffer[1] = data & 0xff
-        # REG 03 - no auto tune, 76-108 band, 0.1 spacing
-        data = (RDA_TUNE & 0) | RDA_76_108MHZ | RDA_100KHZ
+        # REG 03 - no auto tune, 87-108 band, 0.1 spacing
+        data = (RDA_TUNE & 0) | RDA_87_108MHZ | RDA_100KHZ
         self.out_buffer[2] = data >> 8
         self.out_buffer[3] = data & 0xff
         # REG 04 - audio 50US, no soft mute, disable AFC
         data = RDA_50US | RDA_AFCD
         self.out_buffer[4] = data >> 8
         self.out_buffer[5] = data & 0xff
-        # REG 05 - max volume
-        data = RDA_INT_MODE | 0x0880 | RDA_VOLUME
+        # REG 05 - mid volume
+        data = RDA_INT_MODE | 0x0880 | (RDA_VOLUME >> 1)
         self.out_buffer[6] = data >> 8
         self.out_buffer[7] = data & 0xff
         # REG 06 - reserved
@@ -186,6 +184,9 @@ class Rda5807m:
         "dmute": {"reg": 2, "mask": RDA_DMUTE, "how": "flag", "left-shift": 0},
         "mono": {"reg": 2, "mask": RDA_MONO, "how": "flag", "left-shift": 0},
         "bass": {"reg": 2, "mask": RDA_BASS, "how": "flag", "left-shift": 0},
+        "seekup": {"reg": 2, "mask": RDA_SEEKUP, "how": "flag", "left-shift": 0},
+        "seek": {"reg": 2, "mask": RDA_SEEK, "how": "flag", "left-shift": 0},
+        "skmode": {"reg": 2, "mask": RDA_SKMODE, "how": "flag", "left-shift": 0},
         "de": {"reg": 4, "mask": RDA_DE, "how": "value", "left-shift": 0},
         "volume": {"reg": 5, "mask": RDA_VOLUME, "how": "value", "left-shift": 0},
         "chan": {"reg": 3, "mask": RDA_CHAN, "how": "value", "left-shift": 6},
@@ -307,6 +308,51 @@ class Rda5807m:
         else:
             self.write_de(RDA_75US)
         self.write_chip(6)
+
+    def set_seek(self, seek_up):
+            self.write_seekup(seek_up)
+            self.write_chip(2)
+            self.write_seek(True)
+            self.write_chip(2)
+
+    def get_infos(self):
+        data3 = self.read_chip(3)
+        data10 = self.read_chip(10)
+        data11 = self.read_chip(11)
+
+        infos = {}
+        infos["rds-ready"] = (data10 & RDA_RDSR) != 0
+        infos["tune-ok"] = (data10 & RDA_STC) != 0
+        infos["seek-fail"] = (data10 & RDA_SF) != 0
+        infos["rds-synchro"] = (data10 & RDA_RDSS) != 0
+        infos["stereo"] = (data10 & RDA_ST) != 0
+
+        chan = data10 & RDA_READCHAN
+        space = data3 & RDA_SPACE
+        if space == RDA_200KHZ:
+            space0 = 0.2
+        elif space == RDA_100KHZ:
+            space0 = 0.1
+        elif space == RDA_50KHZ:
+            space0 = 0.05
+        elif space == RDA_25KHZ:
+            space0 = 0.025
+        band = data3 & RDA_BAND
+        if band == RDA_87_108MHZ:
+            band0 = 87.0
+        elif RDA_76_91MHZ:
+            band0 = 76.0
+        elif RDA_76_108MHZ:
+            band0 = 76.0
+        elif RDA_65_76MHZ:
+            band0 = 65.0
+        infos["freq"] = band0 + chan * space0
+
+        signal = (data11 & RDA_RSSI) >> 10
+        infos["signal"] = "%.1f" % ((signal * 100) / 64,)
+        infos["fm-station"] = (data11 & RDA_FM_READY) != 0
+        infos["fm-true"] = (data11 & RDA_FM_TRUE) != 0
+        return infos
 
     def close(self):
         self.pi.i2c_close(self.read_handle)

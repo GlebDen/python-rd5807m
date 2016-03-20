@@ -21,14 +21,17 @@ class Radio:
             "unmute": {"call": self.radio.set_mute, "value": False},
             "stereo": {"call": self.radio.set_stereo, "value": True},
             "mono": {"call": self.radio.set_stereo, "value": False},
-            "volume": {"call": self.set_volume, "type": int},
+            "vol": {"call": self.set_volume, "type": int},
             "+": {"call": self.set_volume_plus},
             "-": {"call": self.set_volume_moins},
-            "frequency": {"call": self.set_frequency, "type": float},
-            "de-emphasis": {"call": self.set_deemphasis, "type": int},
+            "freq": {"call": self.set_frequency, "type": float},
+            ">": {"call": self.radio.set_seek, "value": True},
+            "<": {"call": self.radio.set_seek, "value": False},
+            "de": {"call": self.set_deemphasis, "type": int},
+            "infos": {"call": self.get_infos},
         }
 
-        self.volume = -1
+        self.volume = 7  # default volume set in rda5807m.py
 
     def initialize(self):
         try:
@@ -60,11 +63,11 @@ class Radio:
             print("   unmute")
             print("   mono")
             print("   stereo")
-            print("   volume=<int>")
+            print("   vol=<int>")
             print("   +")
             print("   -")
-            print("   frequency=<float>")
-            print("   de-emphasis=<int>")
+            print("   freq=<float>")
+            print("   de=<int>")
         else:
             parts = entry.split('=')
             command = parts[0]
@@ -100,9 +103,6 @@ class Radio:
         self.radio.set_volume(volume)
 
     def set_volume_moins(self):
-        if self.volume == -1:
-            print("set volume fist")
-            return
         if self.volume == 0:
             return
         self.volume -= 1
@@ -110,9 +110,6 @@ class Radio:
         self.radio.set_volume(self.volume)
 
     def set_volume_plus(self):
-        if self.volume == -1:
-            print("set volume fist")
-            return
         if self.volume == 15:
             return
         self.volume += 1
@@ -129,6 +126,10 @@ class Radio:
         if deemphasis not in [50, 75]:
             print("bad de-emphasis value (50, 75)")
         self.radio.set_deemphasis(deemphasis)
+
+    def get_infos(self):
+        infos = self.radio.get_infos()
+        print(infos)
 
     def close(self):
         self.radio.close()
