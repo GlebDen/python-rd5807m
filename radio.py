@@ -11,22 +11,22 @@ from rda5807m import Rda5807m
 class Radio:
 
     def __init__(self):
-        self.radio = Rda5807m(1)
+        self.device = Rda5807m(1)
 
         self.commands = {
-            "on": {"call": self.radio.on},
-            "off": {"call": self.radio.off},
-            "bass": {"call": self.radio.set_bass, "type": bool},
-            "mute": {"call": self.radio.set_mute, "value": True},
-            "unmute": {"call": self.radio.set_mute, "value": False},
-            "stereo": {"call": self.radio.set_stereo, "value": True},
-            "mono": {"call": self.radio.set_stereo, "value": False},
+            "on": {"call": self.device.on},
+            "off": {"call": self.device.off},
+            "bass": {"call": self.device.set_bass, "type": bool},
+            "mute": {"call": self.device.set_mute, "value": True},
+            "unmute": {"call": self.device.set_mute, "value": False},
+            "stereo": {"call": self.device.set_stereo, "value": True},
+            "mono": {"call": self.device.set_stereo, "value": False},
             "vol": {"call": self.set_volume, "type": int},
             "+": {"call": self.set_volume_plus},
             "-": {"call": self.set_volume_moins},
             "freq": {"call": self.set_frequency, "type": float},
-            ">": {"call": self.radio.set_seek, "value": True},
-            "<": {"call": self.radio.set_seek, "value": False},
+            ">": {"call": self.device.set_seek, "value": True},
+            "<": {"call": self.device.set_seek, "value": False},
             "de": {"call": self.set_deemphasis, "type": int},
             "infos": {"call": self.get_infos},
         }
@@ -35,7 +35,7 @@ class Radio:
 
     def initialize(self):
         try:
-            self.radio.init_chip()
+            self.device.init_chip()
         except:
             print("problem while initializing")
             loop.stop()
@@ -100,39 +100,43 @@ class Radio:
             print("bad volume value (0-15)")
             return
         self.volume = volume
-        self.radio.set_volume(volume)
+        self.device.set_volume(volume)
 
     def set_volume_moins(self):
         if self.volume == 0:
             return
         self.volume -= 1
         print("volume: %d" % (self.volume,))
-        self.radio.set_volume(self.volume)
+        self.device.set_volume(self.volume)
 
     def set_volume_plus(self):
         if self.volume == 15:
             return
         self.volume += 1
         print("volume: %d" % (self.volume,))
-        self.radio.set_volume(self.volume)
+        self.device.set_volume(self.volume)
 
     def set_frequency(self, frequency):
         if not 76 <= frequency <= 107.5:
             print("bad frequency value (76-107.5)")
         frequency = int(frequency * 10)
-        self.radio.set_frequency(frequency)
+        self.device.set_frequency(frequency)
 
     def set_deemphasis(self, deemphasis):
         if deemphasis not in [50, 75]:
             print("bad de-emphasis value (50, 75)")
-        self.radio.set_deemphasis(deemphasis)
+        self.device.set_deemphasis(deemphasis)
 
     def get_infos(self):
-        infos = self.radio.get_infos()
+        infos = self.device.get_infos()
         print(infos)
 
+    def poll_rds(self):
+        self.device.process_rds()
+        loop.call_later(0.1, self.poll_rds)
+
     def close(self):
-        self.radio.close()
+        self.device.close()
 
 
 radio = Radio()
@@ -142,6 +146,7 @@ radio.print_prompt()
 
 loop = asyncio.get_event_loop()
 loop.add_reader(sys.stdin, radio.got_stdin_data)
+loop.call_later(1, radio.poll_rds)
 loop.run_forever()
 
 radio.close()

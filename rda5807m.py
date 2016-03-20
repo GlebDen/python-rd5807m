@@ -8,6 +8,7 @@
 
 from functools import partial
 import pigpio
+from string import printable
 
 RDA_I2C_WRITE_ADDRESS = 0x10
 RDA_I2C_READ_ADDRESS = 0x11
@@ -100,6 +101,12 @@ RDA_ABCD_E = 0b0000000000010000
 RDA_BLERA = 0b0000000000001100
 RDA_BLERB = 0b0000000000000011
 
+# ========
+
+RDS_GROUP_TYPE_CODE = 0xf000
+RDS_PTY = 0x03e0
+RDS_B0 = 0x0800
+
 
 class Rda5807m:
 
@@ -111,6 +118,8 @@ class Rda5807m:
 
         self.out_buffer = [0] * 12
         self.read_bug = False
+
+        self.rds_init()
 
     def read_chip(self, reg):
         data = self.pi.i2c_read_word_data(self.read_handle, reg)
@@ -321,7 +330,6 @@ class Rda5807m:
         data11 = self.read_chip(11)
 
         infos = {}
-        infos["rds-ready"] = (data10 & RDA_RDSR) != 0
         infos["tune-ok"] = (data10 & RDA_STC) != 0
         infos["seek-fail"] = (data10 & RDA_SF) != 0
         infos["rds-synchro"] = (data10 & RDA_RDSS) != 0
@@ -352,7 +360,86 @@ class Rda5807m:
         infos["signal"] = "%.1f" % ((signal * 100) / 64,)
         infos["fm-station"] = (data11 & RDA_FM_READY) != 0
         infos["fm-true"] = (data11 & RDA_FM_TRUE) != 0
+
+        infos["PS"] = self.station_name
+        infos["PTY"] = self.pty
+        infos["Text"] = self.text
+        infos["CTime"] = self.ctime
         return infos
+
+    def rds_init(self):
+        self.pty = 0
+        self.station_name = "--------"
+        self.station_name_tmp_1 = ['-'] * 8
+        self.station_name_tmp_2 = ['-'] * 8
+        self.text = '-' * 64
+        self.text_tmp = ['-'] * 64
+        self.ab = False
+        self.idx = 0
+        self.ctime = ""
+
+    def process_rds(self):
+        reg_a = self.read_chip(10)
+        if reg_a & RDA_RDSS == 0:
+            self.rds_init()
+        reg_b = self.read_chip(11)
+        if reg_a & RDA_RDSR == 0 or reg_b & RDA_BLERB != 0:
+            # no new rds group ready
+            return
+
+        self.read_chip(12)
+        block_b = self.read_chip(13)
+        block_c = self.read_chip(14)
+        block_d = self.read_chip(15)
+
+        self.pty = (block_b & RDS_PTY) >> 5
+
+        group_type = 0x0a + ((block_b & RDS_GROUP_TYPE_CODE) >> 8) | ((block_b & RDS_B0) >> 11)
+
+        if group_type in [0x0a, 0x0b]:
+            # PS name
+            idx = (block_b & 3) * 2
+            c1 = chr(block_d >> 8)
+            c2 = chr(block_d & 0xff)
+            if c1 in printable and c2 in printable:
+                if self.station_name_tmp_1[idx:idx + 2] == [c1, c2]:
+                    self.station_name_tmp_2[idx:idx + 2] = [c1, c2]
+                    if self.station_name_tmp_1 == self.station_name_tmp_2:
+                        self.station_name = ''.join(self.station_name_tmp_1)
+                if self.station_name_tmp_1[idx:idx + 2] != [c1, c2]:
+                    self.station_name_tmp_1[idx:idx + 2] = [c1, c2]
+
+        elif group_type == 0x2a:
+            # Text
+            idx = (block_b & 0x0f) * 4
+            if idx < self.idx:
+                self.text = ''.join(self.text_tmp)
+            self.idx = idx
+
+            ab = (block_b & 0x10) != 0
+            if ab != self.ab:
+                self.text = '-' * 64
+                self.text_tmp = ['-'] * 64
+                self.ab = ab
+
+            c1 = chr(block_c >> 8)
+            c2 = chr(block_c & 0xff)
+            c3 = chr(block_d >> 8)
+            c4 = chr(block_d & 0xff)
+            if c1 in printable and c2 in printable and c3 in printable and c4 in printable:
+                self.text_tmp[idx:idx + 4] = [c1, c2, c3, c4]
+
+        elif group_type == 0x4a:
+            offset = block_d & 0x1f
+            mins = (block_d & 0x0fc0) >> 6
+            hour = ((block_c & 1) << 4) | (block_d >> 12)
+            mins += 60 * hour
+            if block_d & 0x20:
+                mins -= 30 * offset
+            else:
+                mins += 30 * offset
+            if 0 < mins < 1500:
+                self.ctime = "CT %2d:%2d" % (int(mins / 60), mins % 60)
 
     def close(self):
         self.pi.i2c_close(self.read_handle)
