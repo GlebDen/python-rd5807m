@@ -361,13 +361,11 @@ class Rda5807m:
         infos["fm-true"] = (data11 & RDA_FM_TRUE) != 0
 
         infos["PS"] = self.station_name
-        infos["PTY"] = self.pty
         infos["Text"] = self.text
         infos["CTime"] = self.ctime
         return infos
 
     def rds_init(self):
-        self.pty = 0
         self.station_name = "--------"
         self.station_name_tmp_1 = ['-'] * 8
         self.station_name_tmp_2 = ['-'] * 8
@@ -391,8 +389,6 @@ class Rda5807m:
         if reg_a & RDA_RDSR == 0 or reg_b & RDA_BLERB != 0:
             # no new rds group ready
             return
-
-        self.pty = (block_b & RDS_PTY) >> 5
 
         group_type = 0x0a + ((block_b & RDS_GROUP_TYPE_CODE) >> 8) | ((block_b & RDS_B0) >> 11)
 
