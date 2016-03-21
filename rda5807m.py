@@ -378,18 +378,19 @@ class Rda5807m:
         self.ctime = ""
 
     def process_rds(self):
-        reg_a = self.read_chip(10)
+        reg_a_f = self.pi.i2c_read_i2c_block_data(self.read_handle, 10, 12)[1]
+        reg_a = (reg_a_f[0] << 8) | reg_a_f[1]
+        reg_b = (reg_a_f[2] << 8) | reg_a_f[3]
+        # block_a = (reg_a_f[4] << 8) | reg_a_f[5]
+        block_b = (reg_a_f[6] << 8) | reg_a_f[7]
+        block_c = (reg_a_f[8] << 8) | reg_a_f[9]
+        block_d = (reg_a_f[10] << 8) | reg_a_f[11]
+
         if reg_a & RDA_RDSS == 0:
             self.rds_init()
-        reg_b = self.read_chip(11)
         if reg_a & RDA_RDSR == 0 or reg_b & RDA_BLERB != 0:
             # no new rds group ready
             return
-
-        self.read_chip(12)
-        block_b = self.read_chip(13)
-        block_c = self.read_chip(14)
-        block_d = self.read_chip(15)
 
         self.pty = (block_b & RDS_PTY) >> 5
 
