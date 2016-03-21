@@ -14,21 +14,24 @@ class Radio:
         self.device = Rda5807m(1)
 
         self.commands = {
-            "on": {"call": self.device.on},
-            "off": {"call": self.device.off},
-            "bass": {"call": self.device.set_bass, "type": bool},
-            "mute": {"call": self.device.set_mute, "value": True},
-            "unmute": {"call": self.device.set_mute, "value": False},
-            "stereo": {"call": self.device.set_stereo, "value": True},
-            "mono": {"call": self.device.set_stereo, "value": False},
-            "vol": {"call": self.set_volume, "type": int},
-            "+": {"call": self.set_volume_plus},
-            "-": {"call": self.set_volume_moins},
-            "freq": {"call": self.set_frequency, "type": float},
-            ">": {"call": self.device.set_seek, "value": True},
-            "<": {"call": self.device.set_seek, "value": False},
-            "de": {"call": self.set_deemphasis, "type": int},
-            "infos": {"call": self.get_infos},
+            "on": {"call": self.device.on, "help": "power on device"},
+            "off": {"call": self.device.off, "help": "power off device"},
+            "^": {"call": self.device.set_bass, "value": True, "help": "bass boost"},
+            "v": {"call": self.device.set_bass, "value": False, "help": "normal bass"},
+            "1": {"call": self.device.set_mute, "value": True, "help": "mute"},
+            "0": {"call": self.device.set_mute, "value": False, "help": "unmute"},
+            "s": {"call": self.device.set_stereo, "value": True, "help": "stereo"},
+            "m": {"call": self.device.set_stereo, "value": False, "help": "mono"},
+            "v": {"call": self.set_volume, "type": int, "help": "set volume"},
+            "+": {"call": self.set_volume_plus, "help": "increase volume"},
+            "-": {"call": self.set_volume_moins, "help": "decrease volume"},
+            "f": {"call": self.set_frequency, "type": float, "help": "set frequency"},
+            ">": {"call": self.device.set_seek, "value": True, "help": "seek up"},
+            "<": {"call": self.device.set_seek, "value": False, "help": "seek down"},
+            "d": {"call": self.set_deemphasis, "type": int, "help": "de-emphasize"},
+            "i": {"call": self.get_infos, "help": "get infos"},
+            "h": {"call": self.help, "help": "help"},
+            "q": {"call": self.quit, "help": "quit"},
         }
 
         self.volume = 7  # default volume set in rda5807m.py
@@ -50,50 +53,39 @@ class Radio:
             self.parse_command(input_string)
         self.print_prompt()
 
+    def quit(self):
+        loop.stop()
+
+    def help(self):
+        for k, v in self.commands.items():
+            print("%s : %s" % (k, v["help"]))
+
     def parse_command(self, entry):
-        if entry == "quit":
-            loop.stop()
-        elif entry == "help":
-            print("commands :")
-            print("   on")
-            print("   off")
-            print("   help")
-            print("   bass=<bool>")
-            print("   mute")
-            print("   unmute")
-            print("   mono")
-            print("   stereo")
-            print("   vol=<int>")
-            print("   +")
-            print("   -")
-            print("   freq=<float>")
-            print("   de=<int>")
-        else:
-            parts = entry.split('=')
-            command = parts[0]
-            if command in self.commands:
-                params = self.commands[command]
-                call = params["call"]
-                if len(parts) == 1:
-                    if "value" in params:
-                        value = params["value"]
+        parts = entry.split('=')
+        command = parts[0]
+        if command in self.commands:
+            params = self.commands[command]
+            call = params["call"]
+            if len(parts) == 1:
+                if "value" in params:
+                    value = params["value"]
+                    call(value)
+                else:
+                    call()
+            elif len(parts) == 2:
+                value = ast.literal_eval(parts[1])
+                if "type" in params:
+                    type_ = params["type"]
+                    if type(value) == type_:
                         call(value)
                     else:
-                        call()
-                elif len(parts) == 2:
-                    value = ast.literal_eval(parts[1])
-                    if "type" in params:
-                        type_ = params["type"]
-                        if type(value) == type_:
-                            call(value)
-                        else:
-                            print("bad value type")
-                    else:
-                        print("invalid syntax")
+                        print("bad value type")
                 else:
                     print("invalid syntax")
             else:
-                print("command not found")
+                print("invalid syntax")
+        else:
+            print("command not found")
 
     def set_volume(self, volume):
         if not 0 <= volume <= 15:
@@ -141,7 +133,7 @@ class Radio:
 
 radio = Radio()
 radio.initialize()
-radio.parse_command("help")
+radio.help()
 radio.print_prompt()
 
 loop = asyncio.get_event_loop()

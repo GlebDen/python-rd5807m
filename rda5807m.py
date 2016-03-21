@@ -332,7 +332,6 @@ class Rda5807m:
         infos = {}
         infos["tune-ok"] = (data10 & RDA_STC) != 0
         infos["seek-fail"] = (data10 & RDA_SF) != 0
-        infos["rds-synchro"] = (data10 & RDA_RDSS) != 0
         infos["stereo"] = (data10 & RDA_ST) != 0
 
         chan = data10 & RDA_READCHAN
@@ -439,7 +438,7 @@ class Rda5807m:
             else:
                 mins += 30 * offset
             if 0 < mins < 1500:
-                self.ctime = "CT %2d:%2d" % (int(mins / 60), mins % 60)
+                self.ctime = "CT %02d:%02d" % (int(mins / 60), mins % 60)
 
     def close(self):
         self.pi.i2c_close(self.read_handle)
